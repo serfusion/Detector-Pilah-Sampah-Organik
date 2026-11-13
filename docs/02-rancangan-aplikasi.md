@@ -226,7 +226,8 @@ Pembaca timbangan dan pengenal sampah dibuat sebagai komponen terpisah yang bisa
 
 ## 13. Izin dan privasi
 
-- Izin yang diminta hanya kamera, ditambah notifikasi bila nanti ada pengingat. Lokasi GPS tidak diperlukan.
+- Izin yang diminta aplikasi: kamera, ditambah notifikasi bila nanti ada pengingat. Lokasi GPS tidak diperlukan.
+- Pustaka ML Kit otomatis menambahkan izin internet dan status jaringan. ML Kit memakainya untuk mengirim metrik performa dan pemakaian API ke Google, **bukan** foto atau teks hasil baca. Mulai M3, internet juga dipakai untuk sinkron ke Supabase.
 - Saat mendaftar, warga membaca dan menyetujui penjelasan singkat: data apa yang disimpan, untuk apa fotonya, dan siapa yang bisa melihat.
 - Leaderboard hanya menampilkan nama tampilan atau samaran dan RT/RW, tanpa alamat.
 - Foto hanya dipakai untuk melatih AI jika warga menyetujuinya lewat pilihan terpisah.
