@@ -177,8 +177,8 @@ private fun KartuVersiUji() {
             Icon(Icons.Filled.Info, contentDescription = null)
             Spacer(Modifier.width(12.dp))
             Text(
-                "Versi uji coba. Fitur akan bertambah bertahap: membaca timbangan, mengenali isi sampah, " +
-                    "menyimpan setoran, poin, dan leaderboard.",
+                "Versi uji coba. Kamera sudah bisa membaca angka timbangan dan mengenali isi sampah. " +
+                    "Menyimpan setoran, poin, dan leaderboard menyusul di tahap berikutnya.",
                 style = MaterialTheme.typography.bodyMedium,
             )
         }

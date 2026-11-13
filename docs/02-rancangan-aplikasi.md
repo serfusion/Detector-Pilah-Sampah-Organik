@@ -86,12 +86,14 @@ Tampilan memakai huruf besar, kontras tinggi, dan kata-kata sederhana supaya nya
 
 ### 7.1 Cara kerja
 
-1. **CameraX** menampilkan pratinjau dan menganalisis frame sekitar 5–10 kali per detik. Hanya frame terbaru yang diproses.
-2. Gambar **dipotong** sesuai kotak panduan supaya tulisan lain di sekitar timbangan tidak ikut terbaca.
+1. **CameraX** menampilkan pratinjau dan menganalisis frame (resolusi 1280×720) paling banyak 5 kali per detik. Hanya frame terbaru yang diproses.
+2. Gambar **dipotong** sesuai kotak panduan supaya tulisan lain di sekitar timbangan tidak ikut terbaca. Potongan itu diperbesar bila kecil, lalu diubah menjadi abu-abu berkontras tinggi.
 3. **ML Kit Text Recognition v2** (on-device) membaca teks dari potongan gambar itu.
-4. **Parsing**: aplikasi mengambil pola angka (`0–9`, titik atau koma desimal) dan satuan (`g`/`kg`) bila terlihat, lalu mengubahnya ke gram berdasarkan profil timbangan.
-5. **Stabilisasi**: angka dikunci bila nilai yang sama muncul di sebagian besar frame selama ±1 detik (misalnya ≥5 frame), nilainya minimal batas tertentu (misalnya 10 g), dan masih dalam kapasitas timbangan.
-6. Saat angka terkunci, aplikasi **mengambil foto resolusi penuh** yang memuat sampah sekaligus layar timbangan. Foto ini bisa diperiksa ulang oleh kader.
+4. **Parsing**: aplikasi mengambil pola angka (`0–9`, titik atau koma desimal) dan satuan (`g`/`kg`) bila terlihat, lalu mengubahnya ke gram berdasarkan profil timbangan. Huruf yang mirip angka 7-segmen (O→0, S→5, l→1, B→8, b→6, Z→2) dikembalikan menjadi angka.
+5. **Stabilisasi**: angka dikunci bila nilai yang sama terbaca minimal 3 kali, bertahan ±0,6 detik, ≥70% bacaan sejak angka itu muncul bernilai sama, bacaan terakhir juga sama, nilainya minimal batas tertentu (misalnya 10 g), dan masih dalam kapasitas timbangan. Syaratnya berbasis waktu, jadi HP lambat tetap bisa mengunci.
+6. Saat angka terkunci, **frame yang sedang dianalisis disimpan sebagai foto bukti** (JPEG, sisi terpanjang 1280 px). Foto ini memuat sampah sekaligus layar timbangan, jadi bisa diperiksa ulang oleh kader.
+
+Implementasinya ada di `app/src/main/java/io/github/serfusion/gasukom/timbang/`: `PembacaAngka.kt` (parsing), `Penstabil.kt` (stabilisasi), dan `AnalisisTimbang.kt` (CameraX + ML Kit). Ketiganya punya unit test.
 
 ### 7.2 Risiko terbesar: angka 7-segmen
 
@@ -117,13 +119,13 @@ Layar timbangan memakai angka **7-segmen**. Pembaca teks umum seperti ML Kit ser
 
 ## 8. Mengenali isi sampah
 
-**MVP:** ML Kit Image Labeling (model dasar on-device dengan ±400 label umum) dijalankan pada frame kamera yang sama. Labelnya dipetakan ke tiga kelompok:
+**MVP:** ML Kit Image Labeling (model dasar on-device dengan 447 label umum) dijalankan pada frame kamera yang sama, kira-kira setiap 0,8 detik. Labelnya dipetakan ke tiga kelompok (`klasifikasi/PemetaLabel.kt`):
 
-- **Organik**, misalnya label makanan, buah, sayur, tanaman, daun, dan bunga.
-- **Non-organik**, misalnya label botol, kantong/plastik, kaleng, kaca, dan kemasan.
-- **Netral**, misalnya timbangan, meja, tangan, dan wadah. Kelompok ini diabaikan.
+- **Organik** (keyakinan ≥50%): Food, Fruit, Vegetable, Plant, Flower, Twig/Branch, Bread, Cake, Cuisine/Meal, Couscous (sering muncul untuk nasi), Coffee, Soil, Shell, dan sejenisnya.
+- **Non-organik** (keyakinan ≥60%): Bag (kantong), Paper/Newspaper/Receipt (kertas), Cola/Juice (minuman kemasan), Wine/Alcohol (botol), Junk (sampah campur), Cutlery (sendok/garpu), Textile, Tire, Balloon, dan Toy.
+- **Netral**: label lain, misalnya meja, tangan, wadah, atau timbangan. Kelompok ini diabaikan.
 
-Daftar pemetaan final ditetapkan setelah diuji dengan foto asli.
+**Temuan saat implementasi:** model dasar ML Kit **tidak punya label "plastik" atau "botol"**. Kantong plastik hanya bisa tertangkap lewat label *Bag*, sedangkan kemasan lewat label minuman. Karena itu peringatan non-organik di MVP benar-benar hanya pengingat, dan model khusus di tahap lanjut menjadi penting. Pemetaan dan ambang di atas disetel ulang setelah diuji dengan foto asli.
 
 Hasil deteksi berfungsi sebagai **pengingat**. Aplikasi menampilkan peringatan "Terlihat sampah non-organik, keluarkan dulu". Kalau warga tetap menyimpan, setoran ditandai untuk diverifikasi kader. Deteksi dari satu foto **tidak akan 100% tepat**, misalnya plastik kecil yang tertutup sayuran bisa terlewat. Karena itu foto bukti dan pemeriksaan kader tetap penting.
 
@@ -197,27 +199,28 @@ Paket gratis Supabase membatasi kapasitas penyimpanan file, sekitar 1 GB saat do
 
 ## 12. Arsitektur aplikasi
 
+Struktur paket di `app/src/main/java/io/github/serfusion/gasukom/` (✅ = sudah ada):
+
 ```
-app/
-├─ ui/          Layar Compose: beranda, kamera, konfirmasi, riwayat, leaderboard, kader
-├─ camera/      CameraX: pratinjau, analisis frame, ambil foto
-├─ scale/       Pembaca angka timbangan: potong area, OCR, parsing, stabilisasi
-├─ classifier/  Pengenal isi sampah dan pemetaan label
-├─ points/      Aturan poin dan verifikasi otomatis
-├─ data/        Room (lokal), repository, model data
-└─ sync/        Klien Supabase dan WorkManager
+├─ ui/           ✅ Navigasi, tema, beranda, ikon
+├─ timbang/      ✅ Kamera (CameraX), analisis frame + OCR, pembaca angka, penstabil,
+│                   layar timbang, konfirmasi, pengaturan timbangan, aturan verifikasi
+├─ klasifikasi/  ✅ Pemetaan label ML Kit ke organik/non-organik
+├─ data/         ⬜ Room (lokal), repository, model data (M2)
+├─ poin/         ⬜ Poin, streak, leaderboard (M2)
+└─ sinkron/      ⬜ Klien Supabase dan WorkManager (M3)
 ```
 
-Pustaka utama:
+Pustaka dan versi saat ini:
 
-- Kotlin dan Jetpack Compose (Material 3)
-- CameraX
-- ML Kit Text Recognition v2 dan Image Labeling, versi *bundled* agar jalan offline
-- ML Kit Barcode Scanning untuk kartu QR
-- Room dan WorkManager
-- supabase-kt (Auth, Postgrest, Storage)
+- Kotlin 2.2.21, Android Gradle Plugin 8.13.2, Gradle 8.14.3, compileSdk/targetSdk 36
+- Jetpack Compose (BOM 2025.12.01, Material 3) dan Navigation Compose
+- CameraX 1.5.2
+- ML Kit Text Recognition v2 16.0.1 dan Image Labeling 17.0.9, versi *bundled* agar jalan offline
+- DataStore untuk pengaturan timbangan
+- Menyusul: ML Kit Barcode Scanning (kartu QR), Room, WorkManager, supabase-kt
 
-Versi Android minimum yang diusulkan adalah **Android 7.0 (API 24)**, supaya HP lama warga tetap bisa memakai aplikasinya.
+Versi Android minimum adalah **Android 7.0 (API 24)**, supaya HP lama warga tetap bisa memakai aplikasinya.
 
 Pembaca timbangan dan pengenal sampah dibuat sebagai komponen terpisah yang bisa diuji dengan **kumpulan foto contoh**. Dengan begitu akurasinya bisa diukur sebelum dipakai di lapangan.
 
@@ -231,9 +234,11 @@ Pembaca timbangan dan pengenal sampah dibuat sebagai komponen terpisah yang bisa
 
 ## 14. Distribusi APK
 
-- **GitHub Actions** membangun APK setiap kali ada perubahan. Versi rilis dilampirkan di **GitHub Releases** dan bisa diunduh langsung dari HP.
+- ✅ **GitHub Actions** (`.github/workflows/build-apk.yml`) menjalankan unit test dan membangun APK setiap kali ada perubahan. APK dari branch utama otomatis menggantikan isi pre-release **`build-terbaru`**, jadi link unduhnya selalu sama: <https://github.com/serfusion/Detector-Pilah-Sampah-Organik/releases/download/build-terbaru/gasukom-digital.apk>.
+- APK yang dibagikan adalah build *release*: kode dirampingkan R8, pustaka native dikompres, dan hanya memuat ABI ARM (arm64-v8a, armeabi-v7a). Ukurannya ±22 MB, padahal tanpa langkah ini sekitar 56 MB.
 - Untuk memasangnya, HP Android perlu mengizinkan "instal dari sumber tidak dikenal".
-- Untuk pilot, APK ditandatangani dengan **kunci rilis yang tetap**. Kunci ini disimpan sebagai *secret* di GitHub, bukan di repo. Selama kuncinya sama, pembaruan bisa dipasang di atas versi lama tanpa menghapus data.
+- Selama masa uji, APK ditandatangani dengan kunci debug yang dibuat ulang setiap build, jadi versi lama harus dihapus sebelum memasang versi baru.
+- Untuk pilot, APK ditandatangani dengan **kunci rilis yang tetap**. Kunci ini disimpan sebagai *secret* di GitHub (`GASUKOM_KEYSTORE_BASE64`, `GASUKOM_KEYSTORE_PASSWORD`, `GASUKOM_KEY_ALIAS`, `GASUKOM_KEY_PASSWORD`), bukan di repo. Workflow otomatis memakainya begitu secret tersedia. Selama kuncinya sama, pembaruan bisa dipasang di atas versi lama tanpa menghapus data.
 
 ## 15. Tahap lanjut (setelah MVP)
 
