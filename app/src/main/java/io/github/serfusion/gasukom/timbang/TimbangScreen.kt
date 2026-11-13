@@ -273,7 +273,6 @@ private fun PratinjauKamera(
             }
             previewView.doOnLayout {
                 if (!aktif) return@doOnLayout
-                val viewPort = previewView.viewPort ?: return@doOnLayout
                 val pemilihResolusi = ResolutionSelector.Builder()
                     .setAspectRatioStrategy(AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY)
                     .setResolutionStrategy(
@@ -293,11 +292,13 @@ private fun PratinjauKamera(
                     .build()
                 analisisBaru.setAnalyzer(pelaksana, analyzer)
                 analisis = analisisBaru
-                val grup = UseCaseGroup.Builder()
-                    .setViewPort(viewPort)
+                val pembuatGrup = UseCaseGroup.Builder()
                     .addUseCase(preview)
                     .addUseCase(analisisBaru)
-                    .build()
+                // ViewPort menyamakan area analisis dengan yang terlihat. Bila belum tersedia,
+                // kamera tetap dibuka; analyzer memotong tengah sesuai rasio layar sebagai cadangan.
+                previewView.viewPort?.let { pembuatGrup.setViewPort(it) }
+                val grup = pembuatGrup.build()
                 try {
                     penyedia.unbindAll()
                     val k = penyedia.bindToLifecycle(lifecycleOwner, CameraSelector.DEFAULT_BACK_CAMERA, grup)
