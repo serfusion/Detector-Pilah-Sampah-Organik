@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Tema jendela dasar. Tampilan isi aplikasi diatur oleh Jetpack Compose (GasukomTheme). -->
+    <style name="Theme.Gasukom" parent="android:Theme.Material.Light.NoActionBar" />
+</resources>

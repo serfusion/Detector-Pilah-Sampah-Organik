@@ -1,0 +1,19 @@
+# Gradle & build
+.gradle/
+build/
+/app/build/
+.kotlin/
+/captures
+.externalNativeBuild
+.cxx
+
+# Konfigurasi lokal (berisi lokasi SDK dan nanti kunci rahasia) — jangan di-commit
+local.properties
+keystore.properties
+*.jks
+*.keystore
+
+# IDE
+.idea/
+*.iml
+.DS_Store
